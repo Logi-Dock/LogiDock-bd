@@ -34,23 +34,6 @@ CREATE TABLE historico_sensor (
     CONSTRAINT ct_fk_sensor FOREIGN KEY (fk_sensor) REFERENCES sensor (id_sensor)
 );
 
-CREATE TABLE usuario (
-	id_usuario INT PRIMARY KEY AUTO_INCREMENT,
-    nome VARCHAR(45),
-    email VARCHAR(45),
-    senha VARCHAR(20),
-    fk_empresa INT,
-    CONSTRAINT ct_fk_empresa FOREIGN KEY (fk_empresa) REFERENCES empresa (id_empresa)
-);
-
-CREATE TABLE nivel_acesso (
-	id_nivel_acesso INT PRIMARY KEY AUTO_INCREMENT,
-    nome VARCHAR(45),
-    fk_usuario INT,
-    CONSTRAINT ct_fk_usuario FOREIGN KEY (fk_usuario) REFERENCES usuario (id_usuario),
-    CONSTRAINT ct_ck_nome CHECK (nome IN ('ADMINISTRADOR', 'GESTOR', 'FUNCIONÁRIO'))
-);
-
 CREATE TABLE doca (
 	id_doca INT PRIMARY KEY AUTO_INCREMENT,
     numero VARCHAR(10),
@@ -60,6 +43,37 @@ CREATE TABLE doca (
     CONSTRAINT ct_ck_status_doca CHECK (status_doca IN ('LIVRE', 'OCUPADA', 'MANUTENÇÃO')),
     CONSTRAINT ct_fk_empresa FOREIGN KEY (fk_empresa) REFERENCES empresa (id_empresa),
     CONSTRAINT ct_fk_sensor FOREIGN KEY (fk_sensor) REFERENCES sensor (id_sensor)
+);
+
+CREATE TABLE nivel_acesso (
+	id_nivel_acesso INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(45),
+    CONSTRAINT ct_ck_nome CHECK (nome IN ('ADMINISTRADOR', 'GESTOR', 'FUNCIONÁRIO'))
+);
+
+CREATE TABLE usuario (
+	id_usuario INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(45),
+    email VARCHAR(45),
+    senha VARCHAR(20),
+    fk_empresa INT,
+    fk_nivel_acesso INT,
+    CONSTRAINT ct_fk_empresa FOREIGN KEY (fk_empresa) REFERENCES empresa (id_empresa),
+    CONSTRAINT ct_fk_nivel_acesso FOREIGN KEY (fk_nivel_acesso) REFERENCES nivel_acesso (id_nivel_acesso)
+);
+
+CREATE TABLE permissao (
+	id_permissao INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(45),
+    descricao VARCHAR(150)
+);
+
+CREATE TABLE permissoes_compartilhadas (
+	id_permissoes_compartilhadas INT PRIMARY KEY AUTO_INCREMENT,
+    fk_nivel_acesso INT,
+    fk_permissao INT,
+    CONSTRAINT ct_fk_nivel_acesso FOREIGN KEY (fk_nivel_acesso) REFERENCES nivel_acesso (id_nivel_acesso),
+    CONSTRAINT ct_fk_permissao FOREIGN KEY (fk_permissao) REFERENCES permissao (id_permissao)
 );
 
 INSERT INTO endereco (numero, cidade, estado, logradouro) VALUES
@@ -89,17 +103,32 @@ INSERT INTO historico_sensor (fk_sensor, dt_hora_entrada, dt_hora_saida) VALUES
 (2, '2026-03-25 07:45:00', '2026-03-25 08:20:00'),
 (4, '2026-03-25 09:00:00', NULL);
 
-INSERT INTO usuario (nome, email, senha, fk_empresa) VALUES
-('Carlos Silva', 'carlos@logbrasil.com', '123456', 1),
-('Ana Souza', 'ana@logbrasil.com', '123456', 1),
-('Marcos Lima', 'marcos@transporto.com', '123456', 2),
-('Fernanda Costa', 'fernanda@docksolutions.com', '123456', 3);
+INSERT INTO nivel_acesso (nome) VALUES
+('ADMINISTRADOR'),
+('FUNCIONÁRIO'),
+('GESTOR');
 
-INSERT INTO nivel_acesso (nome, fk_usuario) VALUES
-('ADMINISTRADOR', 1),
-('FUNCIONÁRIO', 2),
-('GESTOR', 3),
-('GESTOR', 4);
+INSERT INTO permissao (nome, descricao) VALUES
+('CRIAR_DOCA', 'Permite cadastrar novas docas'),
+('EDITAR_DOCA', 'Permite editar docas'),
+('VISUALIZAR_DOCA', 'Permite visualizar docas'),
+('GERENCIAR_USUARIOS', 'Permite gerenciar usuários');
+
+INSERT INTO usuario (nome, email, senha, fk_empresa, fk_nivel_acesso) VALUES
+('Carlos Silva', 'carlos@logbrasil.com', '123456', 1, 1),
+('Ana Souza', 'ana@logbrasil.com', '123456', 1, 2),
+('Marcos Lima', 'marcos@transporto.com', '123456', 2, 3),
+('Fernanda Costa', 'fernanda@docksolutions.com', '123456', 3, 3);
+
+INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
+(1, 1),
+(1, 2),
+(1, 3),
+(1, 4),
+(2, 3),
+(3, 1),
+(3, 2),
+(3, 3);
 
 SELECT
     e.razao_social AS 'Nome da Empresa',
@@ -115,3 +144,16 @@ JOIN sensor s
     ON d.fk_sensor = s.id_sensor
 JOIN historico_sensor hs
     ON hs.fk_sensor = s.id_sensor;
+    
+SELECT
+    u.nome AS 'Usuário',
+    na.nome AS 'Nivel de Acesso',
+    p.nome AS 'Permissão'
+FROM usuario u
+JOIN nivel_acesso na
+    ON u.fk_nivel_acesso = na.id_nivel_acesso
+JOIN permissoes_compartilhadas pc
+    ON pc.fk_nivel_acesso = na.id_nivel_acesso
+JOIN permissao p
+    ON p.id_permissao = pc.fk_permissao
+ORDER BY na.nome;
