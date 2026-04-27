@@ -133,6 +133,7 @@ INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 (3, 3);
 
 
+
 -- Seleciona o usuário, o nivel de acesso e as permissões cadastradas para ele
 SELECT
 u.nome_user AS 'Usuário',
@@ -151,8 +152,7 @@ ON p.id_permissao = pc.fk_permissao
     
 ORDER BY na.nome_nivel_acesso;
 
-
-
+select * from historico_sensor;
 
 -- Exibição de uma ocorrência da doca, mostrando a data de entrada, saida e o tempo de permanencia do caminhão
 SELECT
@@ -162,33 +162,62 @@ d.status_doca AS 'Status da Doca',
 s.modelo_sensor AS 'Modelo do Sensor',
 hs_entrada.dt_registro AS 'Data de Entrada',
 hs_saida.dt_registro AS 'Data da Saída',
-CONCAT(TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, hs_saida.dt_registro), ' horas') AS 'Tempo de Permanência',
 
+CONCAT(
+    TIMESTAMPDIFF(
+        HOUR,
+        hs_entrada.dt_registro,
+        CASE
+            WHEN hs_saida.dt_registro IS NULL THEN NOW()
+            ELSE hs_saida.dt_registro
+        END
+    ),
+    ' horas'
+) AS 'Tempo de Permanência',
+
+-- QUANDO AINDA TA NA DOCA
 CASE
+WHEN hs_saida.dt_registro IS NULL
+    AND TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) > 5
+    THEN 'Em Atraso (em andamento)'
+
+WHEN hs_saida.dt_registro IS NULL
+    AND TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) >= 4
+    THEN 'Quase fora do prazo (em andamento)'
+
+WHEN hs_saida.dt_registro IS NULL
+    THEN 'No Prazo (em andamento)'
+
+-- QUANDO JÁ SAIU
 WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, hs_saida.dt_registro) > 5
-	THEN 'Em Atraso'
-    
+    THEN 'Em Atraso'
+
 WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, hs_saida.dt_registro) >= 4
-	THEN 'Quase fora do prazo'
-    
+    THEN 'Quase fora do prazo'
+
 ELSE 'No Prazo'
 END AS 'Tipo de Ocorrência'
 
 FROM empresa e
 
-JOIN doca d
-ON e.id_empresa = d.fk_empresa
-
-JOIN sensor s
-ON d.id_doca = s.fk_doca
+JOIN doca d ON e.id_empresa = d.fk_empresa
+JOIN sensor s ON d.id_doca = s.fk_doca
 
 JOIN historico_sensor hs_entrada
-ON hs_entrada.fk_sensor = s.id_sensor
-AND hs_entrada.status_sensor = 1
+  ON hs_entrada.fk_sensor = s.id_sensor
+ AND hs_entrada.status_sensor = 1
 
-JOIN historico_sensor hs_saida
-ON hs_saida.fk_sensor = s.id_sensor
-AND hs_saida.status_sensor = 0
-AND hs_saida.dt_registro > hs_entrada.dt_registro
-    
-ORDER BY e.razao_social;
+LEFT JOIN historico_sensor hs_saida
+  ON hs_saida.fk_sensor = s.id_sensor
+ AND hs_saida.status_sensor = 0
+ AND hs_saida.dt_registro > hs_entrada.dt_registro
+
+LEFT JOIN historico_sensor hs_saida2
+  ON hs_saida2.fk_sensor = s.id_sensor
+ AND hs_saida2.status_sensor = 0
+ AND hs_saida2.dt_registro > hs_entrada.dt_registro
+ AND hs_saida2.dt_registro < hs_saida.dt_registro
+
+WHERE hs_saida2.id_historico_sensor IS NULL
+
+ORDER BY hs_entrada.dt_registro;
