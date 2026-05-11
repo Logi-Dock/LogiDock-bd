@@ -100,10 +100,18 @@ INSERT INTO sensor (fk_doca) VALUES
 INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
 ('2026-03-25 10:00:00', 1, 1),
 ('2026-03-25 14:00:00', 0, 1),
+('2026-03-25 14:30:00', 1, 1),
+('2026-03-25 16:30:00', 0, 1),
+('2026-03-25 16:35:00', 1, 1),
+('2026-03-25 22:30:00', 0, 1),
 ('2026-03-26 06:00:00', 1, 2),
 ('2026-03-26 14:35:00', 0, 2),
+('2026-03-25 15:00:00', 1, 2),
+('2026-03-25 20:30:00', 0, 2),
 ('2026-03-26 17:00:00', 1, 3),
-('2026-03-26 20:00:00', 0, 3);
+('2026-03-26 20:00:00', 0, 3),
+('2026-03-25 20:20:00', 1, 3),
+('2026-03-25 23:59:00', 0, 3);
 
 INSERT INTO nivel_acesso (nome_nivel_acesso) VALUES
 ('ADMINISTRADOR'),
@@ -132,8 +140,6 @@ INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 (3, 2),
 (3, 3);
 
-
-
 -- Seleciona o usuário, o nivel de acesso e as permissões cadastradas para ele
 SELECT
 u.nome_user AS 'Usuário',
@@ -155,7 +161,8 @@ ORDER BY na.nome_nivel_acesso;
 select * from historico_sensor;
 
 -- Exibição de uma ocorrência da doca, mostrando a data de entrada, saida e o tempo de permanencia do caminhão
-SELECT
+CREATE OR REPLACE VIEW ocorrencias_docas AS SELECT
+e.id_empresa AS 'ID da Empresa',
 e.razao_social AS 'Nome da Empresa',
 d.numero_doca AS 'Número da Doca',
 d.status_doca AS 'Status da Doca',
@@ -167,14 +174,44 @@ CONCAT(
     TIMESTAMPDIFF(
         HOUR,
         hs_entrada.dt_registro,
-        CASE
-            WHEN hs_saida.dt_registro IS NULL THEN NOW()
-            ELSE hs_saida.dt_registro
-        END
+        CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
     ),
-    ' horas'
+    ' horas',
+    
+    CASE 
+        WHEN (
+            TIMESTAMPDIFF(
+                MINUTE,
+                hs_entrada.dt_registro,
+                CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
+            )
+            -
+            TIMESTAMPDIFF(
+                HOUR,
+                hs_entrada.dt_registro,
+                CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
+            ) * 60
+        ) > 0
+        THEN CONCAT(
+            ' ',
+            (
+                TIMESTAMPDIFF(
+                    MINUTE,
+                    hs_entrada.dt_registro,
+                    CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
+                )
+                -
+                TIMESTAMPDIFF(
+                    HOUR,
+                    hs_entrada.dt_registro,
+                    CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
+                ) * 60
+            ),
+            ' minutos'
+        )
+        ELSE ''
+    END
 ) AS 'Tempo de Permanência',
-
 -- QUANDO AINDA TA NA DOCA
 CASE
 WHEN hs_saida.dt_registro IS NULL
@@ -210,14 +247,19 @@ JOIN historico_sensor hs_entrada
 LEFT JOIN historico_sensor hs_saida
   ON hs_saida.fk_sensor = s.id_sensor
  AND hs_saida.status_sensor = 0
- AND hs_saida.dt_registro > hs_entrada.dt_registro
-
-LEFT JOIN historico_sensor hs_saida2
-  ON hs_saida2.fk_sensor = s.id_sensor
- AND hs_saida2.status_sensor = 0
- AND hs_saida2.dt_registro > hs_entrada.dt_registro
- AND hs_saida2.dt_registro < hs_saida.dt_registro
-
-WHERE hs_saida2.id_historico_sensor IS NULL
+ AND hs_saida.dt_registro = (
+     SELECT MIN(h2.dt_registro)
+     FROM historico_sensor h2
+     WHERE h2.fk_sensor = s.id_sensor
+       AND h2.status_sensor = 0
+       AND h2.dt_registro > hs_entrada.dt_registro
+ )
 
 ORDER BY hs_entrada.dt_registro;
+
+SELECT * FROM ocorrencias_docas;
+SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'D01';
+SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'D02';
+SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'A01';
+SELECT * FROM ocorrencias_docas WHERE `ID da Empresa` = 1;
+SELECT * FROM ocorrencias_docas WHERE DATE(`Data de Entrada`) = '2026-03-26';
