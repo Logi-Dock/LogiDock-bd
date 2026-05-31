@@ -271,3 +271,107 @@ SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'D02';
 SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'A01';
 SELECT * FROM ocorrencias_docas WHERE `ID da Empresa` = 1;
 SELECT * FROM ocorrencias_docas WHERE DATE(`Data de Entrada`) = '2026-03-26';
+
+
+
+
+
+-- ADIÇÕES POR PEDRO
+
+-- kpiDocaMaisAtrasos
+-- KPI 1: doca com mais atrasos
+-- COUNT(*) pq cada linha já é 1 ocorrência
+-- COLLATE pq garante comparação sem erro de maiúscula/minúscula no js
+-- filtro de data pra limitar período
+SELECT
+`Número da Doca` as doca,
+COUNT(*) AS qtd_atrasos
+FROM ocorrencias_docas
+WHERE `ID da Empresa` = 1
+AND `Tipo de Ocorrência` COLLATE utf8mb4_0900_ai_ci LIKE 'Em Atraso'
+AND `Data de Entrada` >= NOW() - INTERVAL 24 HOUR
+GROUP BY `Número da Doca`
+ORDER BY qtd_atrasos DESC
+LIMIT 1;
+
+-- kpiDocaMaiorAtraso
+-- KPI 2: maior atraso individual
+-- TIMESTAMPDIFF calcula duração entre entrada e saída
+-- CASE pra quando não tiver saída ainda (usa NOW)
+-- DATE_FORMAT só pra exibir no front
+SELECT
+`Número da Doca` AS doca,
+DATE_FORMAT(`Data de Entrada`, '%d/%m') AS data,
+DATE_FORMAT(`Data de Entrada`, '%H:%i') AS hora_inicio,
+
+CASE
+	WHEN `Data da Saída` IS NULL
+	THEN 'Agora'
+	ELSE DATE_FORMAT(`Data da Saída`, '%H:%i')
+END AS hora_fim,
+
+TIMESTAMPDIFF(MINUTE,  `Data de Entrada`,
+CASE
+	WHEN `Data da Saída` IS NULL
+	THEN NOW()
+	ELSE `Data da Saída`
+END) AS minutos_atraso
+FROM ocorrencias_docas
+
+WHERE `ID da Empresa` = 1
+AND `Tipo de Ocorrência` LIKE 'Em Atraso%'
+AND `Data de Entrada` >= NOW() - INTERVAL 24 HOUR
+ORDER BY minutos_atraso DESC
+LIMIT 1;
+
+-- kpiDocaMaiorTaxaDeAtrasos
+-- KPI 3: taxa de atraso
+-- COUNT(CASE) conta só atrasos
+-- COUNT(*) total operações
+-- percentual = atrasos / total
+SELECT
+`Número da Doca` AS doca,
+COUNT(CASE
+	WHEN `Tipo de Ocorrência` LIKE '%Atraso%'
+	THEN 1
+END) AS qtd_atrasos,
+COUNT(*) AS qtd_operacoes,
+ROUND(COUNT(CASE
+		WHEN `Tipo de Ocorrência` LIKE '%Atraso%'
+		THEN 1
+	END
+) * 100.0 / COUNT(*), 0) AS percentual
+
+FROM ocorrencias_docas
+WHERE `ID da Empresa` = 1
+AND `Data de Entrada` >= NOW() - INTERVAL 3 MONTH
+
+GROUP BY `Número da Doca`
+HAVING qtd_atrasos > 0
+ORDER BY percentual DESC, qtd_atrasos DESC
+LIMIT 1;
+
+-- kpiDocaMaiorTempoDeAtrasoAcumulado
+-- KPI 4: maior tempo acumulado
+-- SUM dos tempos de atraso por doca
+-- TIMESTAMPDIFF soma duração de cada operação
+-- CASE resolve operação ainda aberta
+SELECT
+`Número da Doca` AS doca,
+SUM(TIMESTAMPDIFF(MINUTE,  `Data de Entrada`,
+CASE
+	WHEN `Data da Saída` IS NULL
+	THEN NOW()
+	ELSE `Data da Saída`
+END)) AS minutos_atraso
+FROM ocorrencias_docas
+
+WHERE `ID da Empresa` = 1
+AND `Tipo de Ocorrência` LIKE 'Em Atraso%'
+AND `Data de Entrada` >= NOW() - INTERVAL 24 HOUR
+GROUP BY doca
+ORDER BY minutos_atraso
+DESC LIMIT 1;
+
+
+-- FIM ADIÇÕES POR PEDRO
