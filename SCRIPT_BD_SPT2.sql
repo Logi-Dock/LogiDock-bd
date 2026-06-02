@@ -140,9 +140,9 @@ INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 (3, 2),
 (3, 3);
 
--- =====================================
--- ========= Select do LOGIN ===========
--- =====================================
+
+-- Select do LOGIN 
+
 SELECT u.id_usuario, u.nome_user, u.email_user, e.razao_social, n.nome_nivel_acesso FROM usuario u
 JOIN empresa e ON e.id_empresa = u.fk_empresa
 JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso;
@@ -373,5 +373,20 @@ GROUP BY doca
 ORDER BY minutos_atraso
 DESC LIMIT 1;
 
-
 -- FIM ADIÇÕES POR PEDRO
+
+
+-- SELECT para mostrar quando o caminhão entrou (Nicole)
+
+SELECT 
+e.razao_social AS Empresa,
+d.numero_doca AS Doca,
+s.modelo_sensor AS Sensor,
+DATE_FORMAT(h.dt_registro, '%d/%m/%Y %H:%i:%s') AS Horario_Entrada
+FROM historico_sensor h
+JOIN sensor s ON h.fk_sensor = s.id_sensor
+JOIN doca d ON s.fk_doca = d.id_doca
+JOIN empresa e ON d.fk_empresa = e.id_empresa
+WHERE h.status_sensor = 1
+ORDER BY h.dt_registro DESC;
+
