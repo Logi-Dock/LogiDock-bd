@@ -50,6 +50,8 @@ CREATE TABLE nivel_acesso (
     CONSTRAINT nivel_ck_nome CHECK (nome_nivel_acesso IN ('ADMINISTRADOR', 'GESTOR', 'FUNCIONÁRIO', 'TÉCNICO'))
 );
 
+
+
 CREATE TABLE usuario (
 	id_usuario INT PRIMARY KEY AUTO_INCREMENT,
     nome_user VARCHAR(45),
@@ -145,9 +147,9 @@ INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 (3, 3),
 (4, 5);
 
--- =====================================
--- ========= Select do LOGIN ===========
--- =====================================
+
+-- Select do LOGIN 
+
 SELECT u.id_usuario, u.nome_user, u.email_user, e.razao_social, n.nome_nivel_acesso FROM usuario u
 JOIN empresa e ON e.id_empresa = u.fk_empresa
 JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso;
@@ -276,3 +278,227 @@ SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'D02';
 SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'A01';
 SELECT * FROM ocorrencias_docas WHERE `ID da Empresa` = 1;
 SELECT * FROM ocorrencias_docas WHERE DATE(`Data de Entrada`) = '2026-03-26';
+
+
+
+
+
+-- ADIÇÕES POR PEDRO
+
+-- kpiDocaMaisAtrasos
+-- KPI 1: doca com mais atrasos
+-- COUNT(*) pq cada linha já é 1 ocorrência
+-- COLLATE pq garante comparação sem erro de maiúscula/minúscula no js
+-- filtro de data pra limitar período
+SELECT
+`Número da Doca` as doca,
+COUNT(*) AS qtd_atrasos
+FROM ocorrencias_docas
+WHERE `ID da Empresa` = 1
+AND `Tipo de Ocorrência` COLLATE utf8mb4_0900_ai_ci LIKE 'Em Atraso'
+AND `Data de Entrada` >= NOW() - INTERVAL 24 HOUR
+GROUP BY `Número da Doca`
+ORDER BY qtd_atrasos DESC
+LIMIT 1;
+
+-- kpiDocaMaiorAtraso
+-- KPI 2: maior atraso individual
+-- TIMESTAMPDIFF calcula duração entre entrada e saída
+-- CASE pra quando não tiver saída ainda (usa NOW)
+-- DATE_FORMAT só pra exibir no front
+SELECT
+`Número da Doca` AS doca,
+DATE_FORMAT(`Data de Entrada`, '%d/%m') AS data,
+DATE_FORMAT(`Data de Entrada`, '%H:%i') AS hora_inicio,
+
+CASE
+	WHEN `Data da Saída` IS NULL
+	THEN 'Agora'
+	ELSE DATE_FORMAT(`Data da Saída`, '%H:%i')
+END AS hora_fim,
+
+TIMESTAMPDIFF(MINUTE,  `Data de Entrada`,
+CASE
+	WHEN `Data da Saída` IS NULL
+	THEN NOW()
+	ELSE `Data da Saída`
+END) AS minutos_atraso
+FROM ocorrencias_docas
+
+WHERE `ID da Empresa` = 1
+AND `Tipo de Ocorrência` LIKE 'Em Atraso%'
+AND `Data de Entrada` >= NOW() - INTERVAL 24 HOUR
+ORDER BY minutos_atraso DESC
+LIMIT 1;
+
+-- kpiDocaMaiorTaxaDeAtrasos
+-- KPI 3: taxa de atraso
+-- COUNT(CASE) conta só atrasos
+-- COUNT(*) total operações
+-- percentual = atrasos / total
+SELECT
+`Número da Doca` AS doca,
+COUNT(CASE
+	WHEN `Tipo de Ocorrência` LIKE '%Atraso%'
+	THEN 1
+END) AS qtd_atrasos,
+COUNT(*) AS qtd_operacoes,
+ROUND(COUNT(CASE
+		WHEN `Tipo de Ocorrência` LIKE '%Atraso%'
+		THEN 1
+	END
+) * 100.0 / COUNT(*), 0) AS percentual
+
+FROM ocorrencias_docas
+WHERE `ID da Empresa` = 1
+AND `Data de Entrada` >= NOW() - INTERVAL 3 MONTH
+
+GROUP BY `Número da Doca`
+HAVING qtd_atrasos > 0
+ORDER BY percentual DESC, qtd_atrasos DESC
+LIMIT 1;
+
+-- kpiDocaMaiorTempoDeAtrasoAcumulado
+-- KPI 4: maior tempo acumulado
+-- SUM dos tempos de atraso por doca
+-- TIMESTAMPDIFF soma duração de cada operação
+-- CASE resolve operação ainda aberta
+SELECT
+`Número da Doca` AS doca,
+SUM(TIMESTAMPDIFF(MINUTE,  `Data de Entrada`,
+CASE
+	WHEN `Data da Saída` IS NULL
+	THEN NOW()
+	ELSE `Data da Saída`
+END)) AS minutos_atraso
+FROM ocorrencias_docas
+
+WHERE `ID da Empresa` = 1
+AND `Tipo de Ocorrência` LIKE 'Em Atraso%'
+AND `Data de Entrada` >= NOW() - INTERVAL 24 HOUR
+GROUP BY doca
+ORDER BY minutos_atraso
+DESC LIMIT 1;
+
+-- FIM ADIÇÕES POR PEDRO
+
+
+-- SELECT para mostrar quando o caminhão entrou (Nicole)
+
+SELECT 
+e.razao_social AS Empresa,
+d.numero_doca AS Doca,
+s.modelo_sensor AS Sensor,
+DATE_FORMAT(h.dt_registro, '%d/%m/%Y %H:%i:%s') AS Horario_Entrada
+FROM historico_sensor h
+JOIN sensor s ON h.fk_sensor = s.id_sensor
+JOIN doca d ON s.fk_doca = d.id_doca
+JOIN empresa e ON d.fk_empresa = e.id_empresa
+WHERE h.status_sensor = 1
+ORDER BY h.dt_registro DESC;
+
+
+-- exibição de uma ocorrência da doca, com somente a data de entrada e tempo de permanência do caminhão 
+SELECT
+u.nome_user AS 'Usuário',
+na.nome_nivel_acesso AS 'Nivel de Acesso',
+p.nome_permissao AS 'Permissão'
+FROM usuario u
+
+JOIN nivel_acesso na
+ON u.fk_nivel_acesso = na.id_nivel_acesso
+    
+JOIN permissoes_compartilhadas pc
+ON pc.fk_nivel_acesso = na.id_nivel_acesso
+    
+JOIN permissao p
+ON p.id_permissao = pc.fk_permissao
+    
+ORDER BY na.nome_nivel_acesso;
+
+select * from historico_sensor;
+
+-- Exibição de uma ocorrência da doca, mostrando a data de entrada, saida e o tempo de permanencia do caminhão
+CREATE OR REPLACE VIEW ocorrencias_docas AS 
+SELECT
+    e.id_empresa AS 'ID da Empresa',
+    e.razao_social AS 'Nome da Empresa',
+    d.numero_doca AS 'Número da Doca',
+    d.status_doca AS 'Status da Doca',
+    s.modelo_sensor AS 'Modelo do Sensor',
+    hs_entrada.dt_registro AS 'Data de Entrada',
+    
+    -- Tempo de Permanência calculado sempre até o momento atual (NOW())
+    CONCAT(
+        TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()), ' horas',
+        CASE 
+            WHEN (TIMESTAMPDIFF(MINUTE, hs_entrada.dt_registro, NOW()) - (TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) * 60)) > 0
+            THEN CONCAT(
+                ' ',
+                (TIMESTAMPDIFF(MINUTE, hs_entrada.dt_registro, NOW()) - (TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) * 60)),
+                ' minutos'
+            )
+            ELSE ''
+        END
+    ) AS 'Tempo de Permanência',
+
+    -- Tipo de Ocorrência baseado apenas no tempo decorrido desde a entrada
+    CASE
+        WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) > 5
+            THEN 'Em Atraso (em andamento)'
+            
+        WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) >= 4
+            THEN 'Quase fora do prazo (em andamento)'
+            
+        ELSE 'No Prazo (em andamento)'
+    END AS 'Tipo de Ocorrência'
+
+FROM empresa e
+JOIN doca d ON e.id_empresa = d.fk_empresa
+JOIN sensor s ON d.id_doca = s.fk_doca
+JOIN historico_sensor hs_entrada ON hs_entrada.fk_sensor = s.id_sensor AND hs_entrada.status_sensor = 1
+
+ORDER BY hs_entrada.dt_registro;
+
+-- Testes de selects para fazer na busca de usuários na página de cadastrar usuário
+ SELECT nome_user, fk_nivel_acesso FROM usuario;
+
+SELECT u.nome_user,n.nome_nivel_acesso  FROM usuario u JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso WHERE fk_empresa = 3;
+
+SELECT u.nome_user,n.nome_nivel_acesso, p.nome_permissao FROM usuario u 
+	JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso 
+	JOIN permissoes_compartilhadas pc ON pc.fk_nivel_acesso = n.id_nivel_acesso
+    JOIN permissao p ON pc.fk_permissao = p.id_permissao
+    WHERE fk_empresa = 3
+    GROUP BY u.nome_user;
+    
+    SELECT DISTINCT
+    u.nome_user,
+    n.nome_nivel_acesso, 
+    p.nome_permissao 
+FROM usuario u   
+JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso   
+JOIN permissoes_compartilhadas pc ON pc.fk_nivel_acesso = n.id_nivel_acesso     
+JOIN permissao p ON pc.fk_permissao = p.id_permissao     
+WHERE u.fk_empresa = 3   
+LIMIT 0, 500;
+
+
+
+-- select da página de cadastrar usuário para fazer a busca
+SELECT 
+    u.nome_user,
+    n.nome_nivel_acesso, 
+    GROUP_CONCAT(p.nome_permissao) AS permissoes
+FROM usuario u   
+JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso   
+JOIN permissoes_compartilhadas pc ON pc.fk_nivel_acesso = n.id_nivel_acesso     
+JOIN permissao p ON pc.fk_permissao = p.id_permissao     
+WHERE u.fk_empresa = 3   
+GROUP BY 
+    u.nome_user, 
+    n.nome_nivel_acesso;
+    
+    -- FIM ADIÇÕES NICOLE!
+    
+    
