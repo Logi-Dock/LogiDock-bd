@@ -50,8 +50,6 @@ CREATE TABLE nivel_acesso (
     CONSTRAINT nivel_ck_nome CHECK (nome_nivel_acesso IN ('ADMINISTRADOR', 'GESTOR', 'FUNCIONÁRIO', 'TÉCNICO'))
 );
 
-
-
 CREATE TABLE usuario (
 	id_usuario INT PRIMARY KEY AUTO_INCREMENT,
     nome_user VARCHAR(45),
@@ -149,7 +147,6 @@ INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 
 
 -- Select do LOGIN 
-
 SELECT u.id_usuario, u.nome_user, u.email_user, e.razao_social, n.nome_nivel_acesso FROM usuario u
 JOIN empresa e ON e.id_empresa = u.fk_empresa
 JOIN nivel_acesso n ON n.id_nivel_acesso = u.fk_nivel_acesso;
@@ -500,5 +497,5 @@ GROUP BY
     n.nome_nivel_acesso;
     
     -- FIM ADIÇÕES NICOLE!
-    
+
     
