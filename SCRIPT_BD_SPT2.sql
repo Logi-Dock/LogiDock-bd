@@ -47,7 +47,7 @@ CREATE TABLE historico_sensor (
 CREATE TABLE nivel_acesso (
 	id_nivel_acesso INT PRIMARY KEY AUTO_INCREMENT,
     nome_nivel_acesso VARCHAR(45),
-    CONSTRAINT nivel_ck_nome CHECK (nome_nivel_acesso IN ('ADMINISTRADOR', 'GESTOR', 'FUNCIONÁRIO'))
+    CONSTRAINT nivel_ck_nome CHECK (nome_nivel_acesso IN ('ADMINISTRADOR', 'GESTOR', 'FUNCIONÁRIO', 'TÉCNICO'))
 );
 
 CREATE TABLE usuario (
@@ -83,7 +83,8 @@ INSERT INTO endereco (numero_endereco, cidade, estado, logradouro) VALUES
 INSERT INTO empresa (razao_social, cnpj, dt_registro, horario_inicio_expediente, horario_final_expediente, fk_endereco) VALUES
 ('Logística Brasil LTDA', '12345678000199', '2024-01-10', '05:00:00', '23:00:00', 1),
 ('TransPorto SA', '98765432000188', '2023-08-20', '08:00:00', '22:00:00', 2),
-('Dock Solutions', '45678912000155', '2025-02-15', '06:00:00', '22:30:00', 3);
+('Dock Solutions', '45678912000155', '2025-02-15', '06:00:00', '22:30:00', 3),
+('Suporte LogiDock', '45678912000888', null, null, null, null);
 
 INSERT INTO doca (numero_doca, status_doca, fk_empresa) VALUES
 ('D01', 'ATIVO', 1),
@@ -116,19 +117,22 @@ INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
 INSERT INTO nivel_acesso (nome_nivel_acesso) VALUES
 ('ADMINISTRADOR'),
 ('FUNCIONÁRIO'),
-('GESTOR');
+('GESTOR'),
+('TÉCNICO');
 
 INSERT INTO permissao (nome_permissao, descricao_permissao) VALUES
 ('CRIAR_DOCA', 'Permite cadastrar novas docas'),
 ('EDITAR_DOCA', 'Permite editar docas'),
 ('VISUALIZAR_DOCA', 'Permite visualizar docas'),
-('GERENCIAR_USUARIOS', 'Permite gerenciar usuários');
+('GERENCIAR_USUARIOS', 'Permite gerenciar usuários'),
+('UTILIZAR IA', 'ACESSO A INTELIGÊNCIA ARTIFICIAL');
 
 INSERT INTO usuario (nome_user, email_user, senha_user, fk_empresa, fk_nivel_acesso) VALUES
 ('Carlos Silva', 'carlos@logbrasil.com', '123456', 1, 1),
 ('Ana Souza', 'ana@logbrasil.com', '123456', 1, 2),
 ('Marcos Lima', 'marcos@transporto.com', '123456', 2, 3),
-('Fernanda Costa', 'fernanda@docksolutions.com', '123456', 3, 3);
+('Fernanda Costa', 'fernanda@docksolutions.com', '123456', 3, 3),
+('Suporte N3', 'suporte@logidock.com', '123456', 4, 4);
 
 INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 (1, 1),
@@ -138,7 +142,8 @@ INSERT INTO permissoes_compartilhadas (fk_nivel_acesso, fk_permissao) VALUES
 (2, 3),
 (3, 1),
 (3, 2),
-(3, 3);
+(3, 3),
+(4, 5);
 
 -- =====================================
 -- ========= Select do LOGIN ===========
