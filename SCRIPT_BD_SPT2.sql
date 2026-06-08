@@ -157,99 +157,108 @@ ORDER BY na.nome_nivel_acesso;
 select * from historico_sensor;
 
 -- Exibição de uma ocorrência da doca, mostrando a data de entrada, saida e o tempo de permanencia do caminhão
-CREATE OR REPLACE VIEW ocorrencias_docas AS SELECT
-e.id_empresa AS 'ID da Empresa',
-e.razao_social AS 'Nome da Empresa',
-d.numero_doca AS 'Número da Doca',
-d.status_doca AS 'Status da Doca',
-s.modelo_sensor AS 'Modelo do Sensor',
-hs_entrada.dt_registro AS 'Data de Entrada',
-hs_saida.dt_registro AS 'Data da Saída',
+CREATE OR REPLACE VIEW ocorrencias_docas AS
+SELECT
+    e.id_empresa AS `ID da Empresa`,
+    e.razao_social AS `Nome da Empresa`,
+    d.numero_doca AS `Número da Doca`,
+    d.status_doca AS `Status da Doca`,
+    s.modelo_sensor AS `Modelo do Sensor`,
+    hs_entrada.dt_registro AS `Data de Entrada`,
+    hs_saida.dt_registro AS `Data da Saída`,
 
-CONCAT(
-    TIMESTAMPDIFF(
-        HOUR,
-        hs_entrada.dt_registro,
-        CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
-    ),
-    ' horas',
-    
-    CASE 
-        WHEN (
-            TIMESTAMPDIFF(
-                MINUTE,
-                hs_entrada.dt_registro,
-                CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
-            )
-            -
-            TIMESTAMPDIFF(
-                HOUR,
-                hs_entrada.dt_registro,
-                CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
-            ) * 60
-        ) > 0
-        THEN CONCAT(
-            ' ',
-            (
+    CONCAT(
+        TIMESTAMPDIFF(
+            HOUR,
+            hs_entrada.dt_registro,
+            COALESCE(hs_saida.dt_registro, NOW())
+        ),
+        ' horas',
+        CASE
+            WHEN (
                 TIMESTAMPDIFF(
                     MINUTE,
                     hs_entrada.dt_registro,
-                    CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
+                    COALESCE(hs_saida.dt_registro, NOW())
                 )
                 -
+                (
+                    TIMESTAMPDIFF(
+                        HOUR,
+                        hs_entrada.dt_registro,
+                        COALESCE(hs_saida.dt_registro, NOW())
+                    ) * 60
+                )
+            ) > 0
+            THEN CONCAT(
+                ' ',
                 TIMESTAMPDIFF(
-                    HOUR,
+                    MINUTE,
                     hs_entrada.dt_registro,
-                    CASE WHEN hs_saida.dt_registro IS NULL THEN NOW() ELSE hs_saida.dt_registro END
-                ) * 60
-            ),
-            ' minutos'
-        )
-        ELSE ''
-    END
-) AS 'Tempo de Permanência',
--- QUANDO AINDA TA NA DOCA
-CASE
-WHEN hs_saida.dt_registro IS NULL
-    AND TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) > 5
-    THEN 'Em Atraso (em andamento)'
+                    COALESCE(hs_saida.dt_registro, NOW())
+                )
+                -
+                (
+                    TIMESTAMPDIFF(
+                        HOUR,
+                        hs_entrada.dt_registro,
+                        COALESCE(hs_saida.dt_registro, NOW())
+                    ) * 60
+                ),
+                ' minutos'
+            )
+            ELSE ''
+        END
+    ) AS `Tempo de Permanência`,
 
-WHEN hs_saida.dt_registro IS NULL
-    AND TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) >= 4
-    THEN 'Quase fora do prazo (em andamento)'
+    CASE
+        WHEN hs_saida.dt_registro IS NULL
+             AND TIMESTAMPDIFF(SECOND, hs_entrada.dt_registro, NOW()) > 20
+        THEN 'Em Atraso (em andamento)'
 
-WHEN hs_saida.dt_registro IS NULL
-    THEN 'No Prazo (em andamento)'
+        WHEN hs_saida.dt_registro IS NULL
+             AND TIMESTAMPDIFF(SECOND, hs_entrada.dt_registro, NOW()) >= 6
+        THEN 'Quase fora do prazo (em andamento)'
 
--- QUANDO JÁ SAIU
-WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, hs_saida.dt_registro) > 5
-    THEN 'Em Atraso'
+        WHEN hs_saida.dt_registro IS NULL
+        THEN 'No Prazo (em andamento)'
 
-WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, hs_saida.dt_registro) >= 4
-    THEN 'Quase fora do prazo'
+        WHEN TIMESTAMPDIFF(
+            SECOND,
+            hs_entrada.dt_registro,
+            hs_saida.dt_registro
+        ) > 20
+        THEN 'Em Atraso'
 
-ELSE 'No Prazo'
-END AS 'Tipo de Ocorrência'
+        WHEN TIMESTAMPDIFF(
+            SECOND,
+            hs_entrada.dt_registro,
+            hs_saida.dt_registro
+        ) >= 6
+        THEN 'Quase fora do prazo'
+
+        ELSE 'No Prazo'
+    END AS `Tipo de Ocorrência`
 
 FROM empresa e
-
-JOIN doca d ON e.id_empresa = d.fk_empresa
-JOIN sensor s ON d.id_doca = s.fk_doca
-
+JOIN doca d
+    ON e.id_empresa = d.fk_empresa
+JOIN sensor s
+    ON d.id_doca = s.fk_doca
 JOIN historico_sensor hs_entrada
-  ON hs_entrada.fk_sensor = s.id_sensor
- AND hs_entrada.status_sensor = 1
+    ON hs_entrada.fk_sensor = s.id_sensor
+   AND hs_entrada.status_sensor = 1
 
 LEFT JOIN historico_sensor hs_saida
-  ON hs_saida.fk_sensor = s.id_sensor
- AND hs_saida.status_sensor = 0
- AND hs_saida.dt_registro = (
-     SELECT MIN(h2.dt_registro)
-     FROM historico_sensor h2
-     WHERE h2.fk_sensor = s.id_sensor
-       AND h2.status_sensor = 0
-       AND h2.dt_registro > hs_entrada.dt_registro
- )
+    ON hs_saida.fk_sensor = s.id_sensor
+   AND hs_saida.status_sensor = 0
+   AND hs_saida.dt_registro = (
+        SELECT MIN(h2.dt_registro)
+        FROM historico_sensor h2
+        WHERE h2.fk_sensor = s.id_sensor
+          AND h2.status_sensor = 0
+          AND h2.dt_registro > hs_entrada.dt_registro
+   )
 
 ORDER BY hs_entrada.dt_registro;
 
@@ -259,10 +268,6 @@ SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'D02';
 SELECT * FROM ocorrencias_docas WHERE `Número da Doca` = 'A01';
 SELECT * FROM ocorrencias_docas WHERE `ID da Empresa` = 1;
 SELECT * FROM ocorrencias_docas WHERE DATE(`Data de Entrada`) = '2026-03-26';
-
-
-
-
 
 -- ADIÇÕES POR PEDRO
 
@@ -398,48 +403,6 @@ ON p.id_permissao = pc.fk_permissao
 ORDER BY na.nome_nivel_acesso;
 
 select * from historico_sensor;
-
--- Exibição de uma ocorrência da doca, mostrando a data de entrada, saida e o tempo de permanencia do caminhão
-CREATE OR REPLACE VIEW ocorrencias_docas AS 
-SELECT
-    e.id_empresa AS 'ID da Empresa',
-    e.razao_social AS 'Nome da Empresa',
-    d.numero_doca AS 'Número da Doca',
-    d.status_doca AS 'Status da Doca',
-    s.modelo_sensor AS 'Modelo do Sensor',
-    hs_entrada.dt_registro AS 'Data de Entrada',
-    
-    -- Tempo de Permanência calculado sempre até o momento atual (NOW())
-    CONCAT(
-        TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()), ' horas',
-        CASE 
-            WHEN (TIMESTAMPDIFF(MINUTE, hs_entrada.dt_registro, NOW()) - (TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) * 60)) > 0
-            THEN CONCAT(
-                ' ',
-                (TIMESTAMPDIFF(MINUTE, hs_entrada.dt_registro, NOW()) - (TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) * 60)),
-                ' minutos'
-            )
-            ELSE ''
-        END
-    ) AS 'Tempo de Permanência',
-
-    -- Tipo de Ocorrência baseado apenas no tempo decorrido desde a entrada
-    CASE
-        WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) > 5
-            THEN 'Em Atraso (em andamento)'
-            
-        WHEN TIMESTAMPDIFF(HOUR, hs_entrada.dt_registro, NOW()) >= 4
-            THEN 'Quase fora do prazo (em andamento)'
-            
-        ELSE 'No Prazo (em andamento)'
-    END AS 'Tipo de Ocorrência'
-
-FROM empresa e
-JOIN doca d ON e.id_empresa = d.fk_empresa
-JOIN sensor s ON d.id_doca = s.fk_doca
-JOIN historico_sensor hs_entrada ON hs_entrada.fk_sensor = s.id_sensor AND hs_entrada.status_sensor = 1
-
-ORDER BY hs_entrada.dt_registro;
 
 -- Testes de selects para fazer na busca de usuários na página de cadastrar usuário
  SELECT nome_user, fk_nivel_acesso FROM usuario;
