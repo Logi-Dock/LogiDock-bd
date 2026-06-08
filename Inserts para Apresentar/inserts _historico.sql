@@ -19,6 +19,45 @@ INSERT INTO sensor (fk_doca) VALUES
 INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
 ('2026-06-07 14:30:00',1,15);
 
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 15:30:00',0,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:00:00',1,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:01:00',0,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:02:00',1,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:03:00',0,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:04:00',1,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:04:00',0,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:05:00',1,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 16:06:00',0,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 21:18:00',1,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 21:22:00',0,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 21:22:00',1,15);
+
+INSERT INTO historico_sensor (dt_registro, status_sensor, fk_sensor) VALUES
+('2026-06-07 21:36:00',0,15);
+
 INSERT INTO sensor (fk_doca) VALUES
 (5),
 (6),
